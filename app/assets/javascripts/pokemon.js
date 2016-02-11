@@ -3,48 +3,74 @@
 
 $(function (){
   var Pokemon = function() {
-    this.pokemon = {};
+    this.name = null;
+    this.attack = null;
+    this.height = null;
+    this.weight = null;
+    this.description = null;
+    this.imageUrl = null;
   };
 
-  Pokemon.prototype.fetchPokemon = function(evnt) {
-  
-    var target = evnt.currentTarget; 
-    var url = $(target).attr("data-pokemon-uri");
-    $.get(url, this.fetchImage.bind(this));
+  Pokemon.prototype.fetchPokemon = function(url) {
+    $.get(url, this.processPokeInfo.bind(this));
   };
 
-  Pokemon.prototype.fetchImage = function (pokeinfo) {
-    var url = pokeinfo.sprites[0].resource_uri;
-    $.get(url, (function(spriteinfo){
-      this.renderPokemon(spriteinfo,pokeinfo);
-    }).bind(this));
+  Pokemon.prototype.processPokeInfo = function(pokeinfo) {
+    this.name = pokeinfo.name;
+    this.attack = pokeinfo.attack;
+    this.height = pokeinfo.height;
+    this.weight = pokeinfo.weight;
+
+    var imagePromise = this.fetchImage(pokeinfo.sprites[0].resource_uri);
+    var descriptionPromise = this.fetchLatestDescription(pokeinfo.descriptions);
+
+    $.when(imagePromise, descriptionPromise).done($.proxy(function(spriteInfo, descriptionInfo){
+      this.description = descriptionInfo[0].description;
+      this.imageUrl = 'http://pokeapi.co' + spriteInfo[0].image;
+
+      this.renderPokemon();
+    }, this)); 
+  }
+
+  Pokemon.prototype.fetchLatestDescription = function(descriptions){
+    var sortedDescriptions = descriptions.sort(function (a, b) {
+      if (a.name > b.name) {
+        return -1;
+      }
+      if (a.name < b.name) {
+        return 1;
+      }
+      return 0;
+    });
+    var resourceUri = sortedDescriptions[0].resource_uri;
+    return $.get(resourceUri); 
+  }
+
+  Pokemon.prototype.fetchImage = function(path) {
+    return $.get(path); 
   };
 
-  Pokemon.prototype.renderPokemon = function (spriteinfo, pokeinfo) {
-
-    $('.modal-title').empty()
-    $('dd').empty()
-    
-    var name = $(pokeinfo).attr("name")
-    var height = $(pokeinfo).attr("height")
-    var weight = $(pokeinfo).attr("weight")
-    var attack = $(pokeinfo).attr("attack")
-    var image = 'http://pokeapi.co' + spriteinfo.image
-
-
-    $('.modal-title').prepend(name)
-    $('.modal-title').append('<small> #' + attack + '</small')
-    $('.height').append('<dd>' + height + '</dd>')
-    $('.weight').append('<dd>' + weight + '</dd>')
-    $('.modal-title').append('<img src=' + '"' + image + '">')
-    $('.modal').modal('show')
-
+  Pokemon.prototype.renderPokemon = function () {
+    $('#name').text(this.name)
+    $('#attack').text('#' + this.attack)
+    $('#height').text(this.height);
+    $('#weight').text(this.weight);
+    $('#image').attr('src', this.imageUrl)
+    $('#description').text(this.description)
+    $('.modal').modal('show');
   };
 
+  $('.pokedex-list').on('click', '.js-show-pokemon', function (e) {
+    var target = e.currentTarget;
+    var pokemon = new Pokemon();
 
-  var poke = new Pokemon();
-  $('.pokedex-list').on('click', '.js-show-pokemon', poke.fetchPokemon.bind(poke));
+    pokemon.fetchPokemon($(target).data("pokemon-uri"));
+  });
 
 });
+
+
+
+
 
 
